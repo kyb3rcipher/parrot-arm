@@ -8,13 +8,10 @@ Raspberry Pi 3 B+, 4 B
 
 ## Use
 
-This repository contains two main scripts, `rpi.sh` to create the root filesystem, and `image-creation.sh` to build the image. Before starting them, you need to install some packages on a Debian based system. 
+This repository contains two main scripts, `rpi.sh` to create the root filesystem, and `image-creation.sh` to build the image. Before starting them, you need to install some packages on a Parrot OS system. 
 
 #### Requirements
-
-    sudo chmod +x ./requirements.sh
-
-then run 
+Just run:
 
     ./requirements.sh
 
