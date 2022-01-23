@@ -82,23 +82,22 @@ steps:
       bash /tmp/set-system.sh
     unless: rootfs_unpacked
 
-  # Adding Raspberry Pi repository
-  - copy-file: /etc/apt/sources.list.d/raspberry.list
-    src: rootfs/etc/apt/sources.list.d/raspberry.list
+  # Adding Debian repository
+  - copy-file: /etc/apt/sources.list.d/debian.list
+    src: rootfs/etc/apt/sources.list.d/debian.list
     perm: 644
     unless: rootfs_unpacked
 
   - chroot: /
     shell: |
-      apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 7FA3303E
       apt update
     unless: rootfs_unpacked
 
   # Install kernel, bootloader and wireless firmware
   - apt: install
     packages:
-    - raspberrypi-kernel
-    - raspberrypi-bootloader
+    - linux-image-armmp
+    - raspi-firmware
     - firmware-brcm80211
     tag: /
     unless: rootfs_unpacked
@@ -110,9 +109,8 @@ steps:
       install -m 644 -o root -g root rootfs/boot/cmdline.txt "${ROOT?}/boot/cmdline.txt"
       install -m 644 -o root -g root rootfs/boot/config.txt "${ROOT?}/boot/config.txt"
 
-      # Removing Raspberry Pi repository
-      rm "${ROOT?}/etc/apt/sources.list.d/raspberry.list"
-      apt update
+      # Removing Debian repository
+      rm "${ROOT?}/etc/apt/sources.list.d/debian.list"
 
   # Systemd service to get resize2fs working
   - copy-file: /etc/systemd/system/firstboot.service
@@ -128,4 +126,3 @@ steps:
     shell: |
       rm /etc/machine-id 
       rm /var/lib/dbus/machine-id
-
