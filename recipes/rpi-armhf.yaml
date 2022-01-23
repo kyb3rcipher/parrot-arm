@@ -1,0 +1,131 @@
+# ParrotOS ARM builder recipe
+# Device: Raspberry Pi armhf
+
+steps:
+  - mkimg: "{{ output }}"
+    size: 2000M
+
+  - mklabel: msdos
+    device: "{{ output }}"
+
+  - mkpart: primary
+    fs-type: 'fat32'
+    device: "{{ output }}"
+    start: 4MiB
+    end: 20%
+    tag: /boot
+
+  - mkpart: primary
+    device: "{{ output }}"
+    start: 20%
+    end: 100%
+    tag: /
+
+  - kpartx: "{{ output }}"
+
+  - mkfs: vfat
+    partition: /boot
+    label: BOOT
+
+  - mkfs: ext4
+    partition: /
+    label: ROOTFS
+
+  - mount: /
+
+  - mount: /boot
+    mount-on: /
+    dirname: '/boot'
+
+  - unpack-rootfs: /
+
+  - qemu-debootstrap: lts
+    mirror: https://deb.parrot.sh/parrot
+    target: /
+    arch: armhf # the foreign architecture to use
+    unless: rootfs_unpacked
+
+  - chroot: /
+    shell: |
+      apt update
+    unless: rootfs_unpacked
+
+  # Basic packages 
+  - apt: install
+    packages:
+    - gnupg
+    - ca-certificates
+    - apt-transport-https
+    - sudo
+    - vim
+    - network-manager
+    - parted
+    - systemd-timesyncd
+    - inxi
+    - cloud-guest-utils
+    tag: /
+    unless: rootfs_unpacked
+
+  - copy-file: /tmp/set-system.sh
+    src: rootfs/tmp/set-system.sh
+    perm: 755
+    unless: rootfs_unpacked
+
+  # set-system.sh config file
+  - copy-file: /tmp/base.conf
+    src: rootfs/tmp/base.conf
+    perm: 644
+    unless: rootfs_unpacked
+
+  - chroot: /
+    shell: |
+      bash /tmp/set-system.sh
+    unless: rootfs_unpacked
+
+  # Adding Raspberry Pi repository
+  - copy-file: /etc/apt/sources.list.d/raspberry.list
+    src: rootfs/etc/apt/sources.list.d/raspberry.list
+    perm: 644
+    unless: rootfs_unpacked
+
+  - chroot: /
+    shell: |
+      apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 7FA3303E
+      apt update
+    unless: rootfs_unpacked
+
+  # Install kernel, bootloader and wireless firmware
+  - apt: install
+    packages:
+    - raspberrypi-kernel
+    - raspberrypi-bootloader
+    - firmware-brcm80211
+    tag: /
+    unless: rootfs_unpacked
+
+  - root-fs: /
+    shell: |
+      # Install /boot config and fstab
+      install -m 644 -o root -g root rootfs/etc/fstab "${ROOT?}/etc/fstab"
+      install -m 644 -o root -g root rootfs/boot/cmdline.txt "${ROOT?}/boot/cmdline.txt"
+      install -m 644 -o root -g root rootfs/boot/config.txt "${ROOT?}/boot/config.txt"
+
+      # Removing Raspberry Pi repository
+      rm "${ROOT?}/etc/apt/sources.list.d/raspberry.list"
+      apt update
+
+  # Systemd service to get resize2fs working
+  - copy-file: /etc/systemd/system/firstboot.service
+    src: rootfs/etc/systemd/system/firstboot.service
+    perm: 644
+    unless: rootfs_unpacked
+    
+  - chroot: /
+    shell: |
+      systemctl enable firstboot.service
+    
+  - chroot: /
+    shell: |
+      rm /etc/machine-id 
+      rm /var/lib/dbus/machine-id
+
